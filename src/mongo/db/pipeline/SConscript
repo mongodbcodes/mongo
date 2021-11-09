@@ -392,6 +392,7 @@ pipelineeEnv.Library(
         'document_source_change_stream_transform.cpp',
         'document_source_check_invalidate.cpp',
         'document_source_check_resume_token.cpp',
+        'document_source_cluster.cpp',
         'document_source_coll_stats.cpp',
         'document_source_count.cpp',
         'document_source_current_op.cpp',

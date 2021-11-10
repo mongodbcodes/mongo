@@ -40,10 +40,10 @@ namespace mongo {
 /**
  * The $cluster stage takes user specified field with location and distance and group locations by it.
  */
-class DocumentSourceCluster final : public DocumentSource, public SplittableDocumentSource {
+class DocumentSourceCluster final : public DocumentSource {
 public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final;
     GetNextResult getNext() final;
     const char* getSourceName() const final;
 
@@ -52,16 +52,16 @@ public:
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,
                 DiskUseRequirement::kWritesTmpData,
-                FacetRequirement::kAllowed};
+                FacetRequirement::kAllowed,
+                TransactionRequirement::kAllowed,
+                LookupRequirement::kAllowed};
     }
     /**
      * The $cluster stage must be run on the merging shard.
      */
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return nullptr;
-    }
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
-        return {this};
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+        // {shardsStage, mergingStage, sortPattern}
+        return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
     static const uint64_t kDefaultMaxMemoryUsageBytes = 100 * 1024 * 1024;

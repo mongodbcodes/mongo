@@ -101,7 +101,7 @@ DocumentSource::GetNextResult DocumentSourceCluster::getNext() {
     return makeDocument(*(_bucketsIterator++));
 }
 
-DocumentSource::GetDepsReturn DocumentSourceCluster::getDependencies(DepsTracker* deps) const {
+DepsTracker::State DocumentSourceCluster::getDependencies(DepsTracker* deps) const {
     // Add the 'groupBy' expression.
     _groupByExpression->addDependencies(deps);
 
@@ -113,7 +113,7 @@ DocumentSource::GetDepsReturn DocumentSourceCluster::getDependencies(DepsTracker
     // We know exactly which fields will be present in the output document. Future stages cannot
     // depend on any further fields. The grouping process will remove any metadata from the
     // documents, so there can be no further dependencies on metadata.
-    return EXHAUSTIVE_ALL;
+    return DepsTracker::State::EXHAUSTIVE_ALL;
 }
 
 Value DocumentSourceCluster::extractKey(const Document& doc) {
@@ -121,7 +121,7 @@ Value DocumentSourceCluster::extractKey(const Document& doc) {
         return Value(BSONNULL);
     }
 
-    Value key = _groupByExpression->evaluate(doc);
+    Value key = _groupByExpression->evaluate(doc, &pExpCtx->variables);
     
     LOG(3) << "key :" << key ;
     // TODO check if extracted value match delta
@@ -267,7 +267,7 @@ void DocumentSourceCluster::addDocumentToBucket(const pair<Value, Document>& ent
                                                 Bucket& bucket) {
     const size_t numAccumulators = _accumulatedFields.size();
     for (size_t k = 0; k < numAccumulators; k++) {
-        bucket._accums[k]->process(_accumulatedFields[k].expression->evaluate(entry.second), false);
+        bucket._accums[k]->process(_accumulatedFields[k].expression->evaluate(entry.second, &pExpCtx->variables), false);
     }
 }
 
@@ -384,6 +384,23 @@ boost::intrusive_ptr<Expression> parseGroupByExpression(
                           << groupByField.toString(false, false));
     }
 }
+
+
+/**
+ * Generates a new file name on each call using a static, atomic and monotonically increasing
+ * number.
+ *
+ * Each user of the Sorter must implement this function to ensure that all temporary files that the
+ * Sorter instances produce are uniquely identified using a unique file name extension with separate
+ * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
+ * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
+ */
+std::string nextFileName() {
+    static AtomicWord<unsigned> documentSourceClusterFileCounter;
+    return "extsort-doc-bucket." +
+        std::to_string(documentSourceClusterFileCounter.fetchAndAdd(1));
+}
+
 }  // namespace
 
 intrusive_ptr<DocumentSource> DocumentSourceCluster::createFromBson(

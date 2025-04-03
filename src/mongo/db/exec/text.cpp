@@ -177,16 +177,21 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
                 opCtx, ws, textAndSearcher.release(), std::move(indexNINScanList));
 
             const MatchExpression* emptyFilter = nullptr;
+            auto ORSearcher = make_unique<OrStage>(opCtx, ws, true, filter);
+            ORSearcher->addChild(textNINStage);
+            
             auto fetchStage = make_unique<FetchStage>(
-                opCtx, ws, textNINStage.release(), emptyFilter, _params.index->getCollection());
+                opCtx, ws, ORSearcher.release(), emptyFilter, _params.index->getCollection());
 
             textMatchStage = make_unique<TextMatchStage>(
                 opCtx, std::move(fetchStage), _params.query, _params.spec, ws, true);
             return textMatchStage;
         }
         const MatchExpression* emptyFilter = nullptr;
+        auto ORSearcher = make_unique<OrStage>(opCtx, ws, true, filter);
+        ORSearcher->addChild(textAndSearcher);
         auto fetchStage = make_unique<FetchStage>(
-            opCtx, ws, textAndSearcher.release(), emptyFilter, _params.index->getCollection());
+            opCtx, ws, ORSearcher.release(), emptyFilter, _params.index->getCollection());
         textMatchStage = make_unique<TextMatchStage>(
             opCtx, std::move(fetchStage), _params.query, _params.spec, ws, true);
 
@@ -234,8 +239,10 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
             opCtx, ws, textORSearcher.release(), std::move(indexNINScanList));
 
         const MatchExpression* emptyFilter = nullptr;
+        auto ORSearcher = make_unique<OrStage>(opCtx, ws, true, filter);
+            ORSearcher->addChild(textNINStage);
         auto fetchStage = make_unique<FetchStage>(
-            opCtx, ws, textNINStage.release(), emptyFilter, _params.index->getCollection());
+            opCtx, ws, ORSearcher.release(), emptyFilter, _params.index->getCollection());
 
         textMatchStage = make_unique<TextMatchStage>(
             opCtx, std::move(fetchStage), _params.query, _params.spec, ws, true);
@@ -243,8 +250,10 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
     }
 
     const MatchExpression* emptyFilter = nullptr;
+    auto ORSearcher = make_unique<OrStage>(opCtx, ws, true, filter);
+    ORSearcher->addChild(textORSearcher);
     auto fetchStage = make_unique<FetchStage>(
-        opCtx, ws, textORSearcher.release(), emptyFilter, _params.index->getCollection());
+        opCtx, ws, ORSearcher.release(), emptyFilter, _params.index->getCollection());
     textMatchStage = make_unique<TextMatchStage>(
         opCtx, std::move(fetchStage), _params.query, _params.spec, ws, true);
 
